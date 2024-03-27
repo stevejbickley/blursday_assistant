@@ -126,8 +126,8 @@ messages_to_create = [
     for response in df_custom_rows['Response_translated']  # Iterate over each response
 ]
 
-# Chunk Messages into Batches of 32
-chunked_messages = list(chunk_messages(messages_to_create))
+# Chunk Messages into Batches of 10
+chunked_messages = list(chunk_messages(messages=messages_to_create, chunk_size=10)) # fine-tune/modify/adapt chunk_size depending on number of tokens in both system message and individual user messages
 
 # List to store created thread IDs
 created_thread_ids = []
@@ -181,10 +181,10 @@ for i in range(0,len(created_thread_ids)):
                 existing_data = pd.read_excel(file_path)
                 # Append new data to existing data
                 updated_df = pd.concat([existing_data, df_responses], ignore_index=True)
+                updated_df.to_excel(writer, index=False, sheet_name='Sheet1') # Write/Append the updated DataFrame to the Excel file
             except Exception as e:  # Handle cases where the existing file is empty or has a different structure
-                updated_df = df_responses
-            # Write/Append the updated DataFrame to the Excel file
-            updated_df.to_excel(writer, index=False, sheet_name='Sheet1')
+                print('skipping thread_id: '+ str(thread_id))
+                next
     else:
         # Create a new Excel file
         with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
