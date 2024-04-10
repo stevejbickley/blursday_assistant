@@ -13,11 +13,11 @@ This assistant is designed to analyze and code data on individuals' perceptions 
  
 # Navigate to the folder
 
-```cd ./stevejbickley/blursday_thematic_code_bot```
+```cd ./stevejbickley/blursday_assistant```
 
 OR
 
-```cd ./blursday_thematic_code_bot```
+```cd ./blursday_assistant```
 
 # Clone the project and run the following commands:
 
