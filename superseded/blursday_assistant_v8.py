@@ -5,12 +5,13 @@ import re
 import time
 import pandas as pd
 from openai import OpenAI
+import openpyxl
 
 # See reference github repo:  https://github.com/pixegami/openai-assistants-api-demo
 # See also OpenAI reference documentation:  ttps://platform.openai.com/docs/assistants/how-it-works
 
 # Enter your Assistant ID here.
-ASSISTANT_ID = "asst_wWt15CA9kKqTI79SLQDPlGWm"
+ASSISTANT_ID = "asst_DmcouHcpU3rAZ4MV2FbwRrkR" # Old (superseded on 10 April - accidental delete): "asst_wWt15CA9kKqTI79SLQDPlGWm"
 
 # Make sure your API key is set as an environment variable.
 client = OpenAI()
@@ -42,27 +43,32 @@ def chunk_messages(messages, chunk_size=32):
 # Function to parse the response and extract values
 def parse_assistant_response(response):
     parsed_data = {
-        'original_data': [],
-        'categories_selected': [],
+        'raw_data': [],
+        'categories': [],
         'ranking': [],
-        'chosen_labels': [],
+        'primary_codes': [],
+        'secondary_codes': [],
         'flagged': [],
-        'justification_comments': []
+        'justification_comments': [],
+        'dump': []  # Add a 'dump' key to store unparsed responses
     }
     # Use re.findall to get all matches and iterate over them
-    original_data_matches = re.findall(r"<original_data>(.*?)</original_data>", response)
+    original_data_matches = re.findall(r"<raw_data>(.*?)</raw_data>", response)
     for match in original_data_matches:
-        parsed_data['original_data'].append(match)
-    categories_selected_matches = re.findall(r"<categories_selected>(.*?)</categories_selected>", response)
+        parsed_data['raw_data'].append(match)
+    categories_selected_matches = re.findall(r"<categories>(.*?)</categories>", response)
     for match in categories_selected_matches:
         # Splitting each match by ', ' and adding as a separate list to accommodate multiple sets
-        parsed_data['categories_selected'].append(match.split(', '))
+        parsed_data['categories'].append(match.split(', '))
     ranking_matches = re.findall(r"<ranking>(.*?)</ranking>", response)
     for match in ranking_matches:
         parsed_data['ranking'].append(match)
-    chosen_labels_matches = re.findall(r"<chosen_labels>(.*?)</chosen_labels>", response)
-    for match in chosen_labels_matches:
-        parsed_data['chosen_labels'].append(match)
+    chosen_labels_primary = re.findall(r"<primary_codes>(.*?)</primary_codes>", response)
+    for match in chosen_labels_primary:
+        parsed_data['primary_codes'].append(match)
+    chosen_labels_secondary = re.findall(r"<secondary_codes>(.*?)</secondary_codes>", response)
+    for match in chosen_labels_secondary:
+        parsed_data['secondary_codes'].append(match)
     flagged_matches = re.findall(r"<flagged>(.*?)</flagged>", response)
     for match in flagged_matches:
         parsed_data['flagged'].append(match)
@@ -115,7 +121,8 @@ file_path = 'blursday_PastFluency-FutureFluency-TemporalLandmarks_2023-03-11_tra
 df = pd.read_csv(file_path, dtype=str) # just read the full dataset
 
 # Filter to Canada
-df_custom_rows = df[ (df['Country_Name'] == 'Canada') | (df['Country_Name'] == 'United Kingdom') | (df['Country_Name'] == 'US')]
+#df_custom_rows = df[ (df['Country_Name'] == 'Canada') | (df['Country_Name'] == 'United Kingdom') | (df['Country_Name'] == 'US')]
+df_custom_rows = df[ (df['Country_Name'] == 'US')]
 
 # Create a list of messages to be added to the thread
 messages_to_create = [
@@ -126,8 +133,19 @@ messages_to_create = [
     for response in df_custom_rows['Response_translated']  # Iterate over each response
 ]
 
+# Create a list of metainfo to be added to the thread
+metainfo_to_create = [
+    {
+        "Experiment_ID": str(row['Experiment_ID']),
+        "PID": str(row['PID']),  # Ensure the content is a string
+        "UTC_Date": str(row['UTC_Date'])  # Ensure the content is a string
+    }
+    for index, row in df_custom_rows.iterrows()  # Iterate over each response
+]
+
 # Chunk Messages into Batches of 10
-chunked_messages = list(chunk_messages(messages=messages_to_create, chunk_size=10)) # fine-tune/modify/adapt chunk_size depending on number of tokens in both system message and individual user messages
+chunked_messages = list(chunk_messages(messages=messages_to_create, chunk_size=5)) # fine-tune/modify/adapt chunk_size depending on number of tokens in both system message and individual user messages
+chunked_metainfo = list(chunk_messages(messages=metainfo_to_create,chunk_size=5))
 
 # List to store created thread IDs
 created_thread_ids = []
@@ -161,15 +179,19 @@ for i in range(0,len(created_thread_ids)):
     # Filter out empty rows: check if all values in each dictionary are empty
     filtered_responses = [response for response in parsed_responses if not all(value == [] or value == "" for value in response.values())]
     # Define a standard set of keys/columns you expect
-    expected_keys = {'original_data', 'categories_selected', 'ranking', 'chosen_labels', 'flagged', 'justification_comments'}
+    expected_keys = {'raw_data', 'categories', 'ranking', 'primary_codes', 'secondary_codes', 'flagged', 'justification_comments'}
     # Ensure each dictionary has all the expected keys, insert None for missing keys
     standardized_responses = [{key: response.get(key, None) for key in expected_keys} for response in filtered_responses]
     # Now pass the standardized list to create a DataFrame
     df_responses = pd.DataFrame(standardized_responses)
     # Columns you want to expand
-    cols_to_expand = ['categories_selected', 'ranking', 'chosen_labels', 'original_data','flagged','justification_comments']
+    cols_to_expand = ['raw_data', 'categories', 'ranking', 'primary_codes', 'secondary_codes', 'flagged', 'justification_comments']
     # Use the function to expand the DataFrame
     df_responses = expand_lists_in_df(df_responses, cols_to_expand)
+    # Assuming chunked_metainfo is your list of dictionaries and df_responses is your existing DataFrame
+    chunked_metainfo_df = pd.DataFrame(chunked_metainfo[i])
+    # Concatenate chunked_metainfo_df with df_responses
+    df_responses = pd.concat([df_responses.reset_index(drop=True), chunked_metainfo_df.reset_index(drop=True)], axis=1)
     # Create a new Excel writer object and save the DataFrame to an xlsx file
     file_path = 'parsed_responses.xlsx'
     # Check if the file already exists
@@ -189,6 +211,7 @@ for i in range(0,len(created_thread_ids)):
         # Create a new Excel file
         with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
             df_responses.to_excel(writer, index=False)
+    time.sleep(1)
 
 
 ##### ------ MAIN CODE - END ------- ####
