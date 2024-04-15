@@ -144,8 +144,21 @@ chunked_metainfo = list(chunk_messages(messages=metainfo_to_create,chunk_size=5)
 created_thread_ids = []
 #created_run_ids = []
 
+# Variable to store output file name
+file_path = 'parsed_responses.xlsx'
+
 # Create Threads for Each Chunk
 for chunk in chunked_messages:
+    if os.path.exists(file_path): # Check if 'parsed_responses.xlsx' exists
+        # If yes, load the existing data from file_path
+        existing_data = pd.read_excel(file_path)
+        existing_data['chunked_message'] = existing_data['chunked_message'].astype(str)  # Enforce string data type
+        #existing_data.dtypes # Get data types of all columns
+        # Check if the current chunk exists in the 'chunked_message' column
+        if str(chunk) in list(existing_data['chunked_message'].unique()):
+            continue  # If yes, skip to the next iteration
+        else:
+            pass  # Does nothing, just acts as a placeholder
     thread = client.beta.threads.create(messages=chunk)
     created_thread_ids.append(thread.id)
     print(f"Thread Created: {thread.id}")
@@ -156,13 +169,15 @@ for i in range(0,len(created_thread_ids)):
     chunk = chunked_messages[i]
     if os.path.exists(file_path): # Check if 'parsed_responses.xlsx' exists
         # If yes, load the existing data from file_path
-        file_path = 'parsed_responses.xlsx'
         existing_data = pd.read_excel(file_path)
         existing_data['thread_id'] = existing_data['thread_id'].astype(str) # Enforce string data type
+        existing_data['chunked_message'] = existing_data['chunked_message'].astype(str)  # Enforce string data type
         #existing_data.dtypes # Get data types of all columns
         # Check if the current thread_id exists in the 'thread_id' column
         if str(thread_id) in list(existing_data['thread_id'].unique()):
             continue # If yes, skip to the next iteration
+        elif str(chunk) in list(existing_data['chunked_message'].unique()):
+            continue  # If yes, skip to the next iteration
         else:
             pass  # Does nothing, just acts as a placeholder
     # Submit the thread to the assistant
