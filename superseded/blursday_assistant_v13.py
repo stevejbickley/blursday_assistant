@@ -104,7 +104,8 @@ def expand_lists_in_df(df, cols_to_expand):
 
 ##### ------ MAIN CODE - START ------- ####
 # Assuming you have a file path, you can customize the number of rows as needed.
-folder_path = '/Users/stevenbickley/stevejbickley/blursday_assistant/' # '/Users/stevenbickley/Library/CloudStorage/Dropbox/Project 2 - Temporal Landmarks/data/'
+#folder_path = '/Users/stevenbickley/stevejbickley/blursday_assistant/' # '/Users/stevenbickley/Library/CloudStorage/Dropbox/Project 2 - Temporal Landmarks/data/'
+folder_path = '/Users/bickley/stevejbickley/blursday_assistant/' # '/Users/stevenbickley/Library/CloudStorage/Dropbox/Project 2 - Temporal Landmarks/data/'
 file_path = 'blursday_PastFluency-FutureFluency-TemporalLandmarks_2023-03-11_translated.csv' #'blursday_PastFluency-FutureFluency_2023-11-30_translated.csv'
 #df_custom_rows = read_and_select_rows(str(folder_path + file_path), 50) # Will return the first 50 rows of the dataframe.
 df = pd.read_csv(file_path, dtype=str) # just read the full dataset
@@ -143,8 +144,8 @@ chunked_metainfo = list(chunk_messages(messages=metainfo_to_create,chunk_size=5)
 # List to store created thread IDs and the associated chunked messages
 created_thread_ids = []
 linked_message_chunks = []
+linked_metainfo_chunks = []
 #created_run_ids = []
-
 
 # Variable to store output file name
 file_path = 'parsed_responses.xlsx'
@@ -160,6 +161,7 @@ if os.path.exists(file_path):  # Check if 'parsed_responses.xlsx' exists
 # Create Threads for Each Chunk
 for i in range(0,len(chunked_messages)):
     chunk = chunked_messages[i]
+    metainfo = chunked_metainfo[i]
     if os.path.exists(file_path): # Check if 'parsed_responses.xlsx' exists
         existing_data['chunked_message'] = existing_data['chunked_message'].astype(str)  # Enforce string data type
         if str(chunk) in list(existing_data['chunked_message'].unique()):  # Check if the current chunk exists in the 'chunked_message' column
@@ -169,12 +171,15 @@ for i in range(0,len(chunked_messages)):
     thread = client.beta.threads.create(messages=chunk)
     created_thread_ids.append(thread.id)
     linked_message_chunks.append(chunk)
+    linked_metainfo_chunks.append(metainfo)
     print(f"Thread Created: {thread.id}")
 
 # Handling Multiple Threads
-for i in range(0,len(created_thread_ids)):
+#for i in range(len(created_thread_ids)-1,0-1,-1): # backwards
+for i in range(0,len(created_thread_ids),1): # forwards
     thread_id = created_thread_ids[i]
     chunk = linked_message_chunks[i]
+    metainfo = linked_metainfo_chunks[i]
     if os.path.exists(file_path): # Check if 'parsed_responses.xlsx' exists
         existing_data = pd.read_excel(file_path) # If yes, load the existing data from file_path
         existing_data['thread_id'] = existing_data['thread_id'].astype(str)  # Enforce string data type
@@ -188,11 +193,15 @@ for i in range(0,len(created_thread_ids)):
     run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID, model="gpt-3.5-turbo-0125", tools=[{"type": "retrieval"}], temperature=float(0.7)) # "gpt-4-turbo"
     #run = client.beta.threads.create_and_run(assistant_id=ASSISTANT_ID, model="gpt-3.5-turbo-0125", tools=[{"type": "retrieval"}], temperature=float(0.7))
     print(f"👉 Run Created: {run.id}")
+    time.sleep(1)
     # Wait for run to complete
     while run.status != "completed":
         run = client.beta.threads.runs.retrieve(thread_id=run.thread_id, run_id=run.id)
-        print(f"🏃 Run Status: {run.status}")
-        time.sleep(3)
+        if run.status == "failed":
+            continue
+            #run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID,model="gpt-3.5-turbo-0125", tools=[{"type": "retrieval"}],temperature=float(0.7))  # "gpt-4-turbo"
+            #print(f"👉 Run Created: {run.id}")
+            #time.sleep(1)
     # Process each thread's messages as needed
     message_response = client.beta.threads.messages.list(thread_id=run.thread_id)
     messages = message_response.data
@@ -211,7 +220,7 @@ for i in range(0,len(created_thread_ids)):
     # Use the function to expand the DataFrame
     df_responses = expand_lists_in_df(df_responses, cols_to_expand)
     # Assuming chunked_metainfo is your list of dictionaries and df_responses is your existing DataFrame
-    chunked_metainfo_df = pd.DataFrame(chunked_metainfo[i])
+    chunked_metainfo_df = pd.DataFrame(metainfo)
     # Concatenate chunked_metainfo_df with df_responses
     df_responses = pd.concat([df_responses.reset_index(drop=True), chunked_metainfo_df.reset_index(drop=True)], axis=1)
     try:

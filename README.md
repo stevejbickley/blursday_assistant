@@ -31,6 +31,10 @@ Activate the virtual environment if needed:
 
 ```source ./blursday_assistant/.venv/bin/activate```
 
+If using windows - to activate environment, run the following:
+```cd ./blursday_assistant```
+```poetry shell```
+```cd ../ ```
 
 # Next, run the following to update poetry and install ffmpeg (if required):
 
