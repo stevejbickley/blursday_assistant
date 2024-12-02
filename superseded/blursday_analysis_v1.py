@@ -1063,7 +1063,7 @@ mean_difference_results = []
 
 # Perform mean calculations and t-tests for each category
 for category in categories:
-    if ("_mean" in category) or ('_count_' in category): # Weighted means for pre-aggregated data
+    if ("_mean" in category) or ('_count' in category): # Weighted means for pre-aggregated data
         past_mean = (past_fluency[category] * past_fluency['participant_count']).sum() / past_fluency['participant_count'].sum()
         future_mean = (future_fluency[category] * future_fluency['participant_count']).sum() / future_fluency['participant_count'].sum()
     else: # Calculate the mean for each group
