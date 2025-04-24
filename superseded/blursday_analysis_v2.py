@@ -1133,8 +1133,8 @@ future_fluency = analysis_data[analysis_data["Task_Name_clean"] == "Future Fluen
 
 # Perform t-tests for each category and comparison
 for category in categories_to_test:
-        future_data = past_fluency[category]
-        past_data = future_fluency[category]
+        past_data = past_fluency[category]
+        future_data = future_fluency[category]
         # Calculate means
         future_mean = future_data.mean()
         past_mean = past_data.mean()
